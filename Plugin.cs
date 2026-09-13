@@ -104,13 +104,14 @@ namespace BetterMissCounter
             bottomText.fontSize = 2f;
             bottomText.color = TestConfig.Instance.BottomColor;
 
-            IDifficultyBeatmap beatmap = data.difficultyBeatmap;
+            BeatmapKey beatmapKey = data.beatmapKey;
+            BeatmapLevel beatmap = data.beatmapLevel;
 
-            if (beatmap.level.levelID.IndexOf("custom_level_") != -1) {
-                difficultyRank = beatmap.difficultyRank;
-                difficulty = beatmap.difficulty.SerializedName();
-                characteristic = beatmap.parentDifficultyBeatmapSet.beatmapCharacteristic.serializedName;
-                levelHash = beatmap.level.levelID.Substring(13);
+            if (beatmap.levelID.IndexOf("custom_level_") != -1) {
+                difficultyRank = GetDifficultyRank(beatmapKey.difficulty);
+                difficulty = beatmapKey.difficulty.SerializedName();
+                characteristic = beatmapKey.characteristic.SerializedName();
+                levelHash = beatmap.levelID.Substring(13);
                 userID = GetUserInfo.GetUserID();
                 userName = GetUserInfo.GetUserName();
                 if (TestConfig.Instance.UseScoreSaber)
@@ -125,6 +126,25 @@ namespace BetterMissCounter
                 }
             }
 
+        }
+
+        static int GetDifficultyRank(BeatmapDifficulty difficulty)
+        {
+            switch (difficulty)
+            {
+                case BeatmapDifficulty.Easy:
+                    return 1;
+                case BeatmapDifficulty.Normal:
+                    return 3;
+                case BeatmapDifficulty.Hard:
+                    return 5;
+                case BeatmapDifficulty.Expert:
+                    return 7;
+                case BeatmapDifficulty.ExpertPlus:
+                    return 9;
+                default:
+                    return 0;
+            }
         }
 
         static string[] GetStringsBetweenStrings(string str, string start, string end)
