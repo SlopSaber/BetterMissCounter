@@ -9,6 +9,8 @@ using System.Collections.Generic;
 using System.Net;
 using UnityEngine;
 using System.Threading;
+using System.Threading.Tasks;
+using IPA.Utilities.Async;
 using IPA.Config.Stores;
 using System.Web;
 using System.Runtime.CompilerServices;
@@ -79,7 +81,8 @@ namespace BetterMissCounter
         int missCount = 0;
         int PBMissCount = -1;
 
-        [Inject] private GameplayCoreSceneSetupData data;
+        [Inject] private GameplayCoreSceneSetupData data { get; set; }
+        private volatile bool destroyed;
 
         int difficultyRank;
         string difficulty;
@@ -112,20 +115,33 @@ namespace BetterMissCounter
                 difficulty = beatmapKey.difficulty.SerializedName();
                 characteristic = beatmapKey.characteristic.SerializedName();
                 levelHash = beatmap.levelID.Substring(13);
-                userID = GetUserInfo.GetUserID();
-                userName = GetUserInfo.GetUserName();
+                _ = LoadPersonalBestsAsync();
+            }
+        }
+
+        private async Task LoadPersonalBestsAsync()
+        {
+            try
+            {
+                var user = await GetUserInfo.GetUserAsync();
+                if (destroyed || user == null) return;
+                userID = user.platformUserId;
+                userName = user.userName;
                 if (TestConfig.Instance.UseScoreSaber)
                 {
-                    Thread t = new Thread(new ThreadStart(ScoreSaberThread));
+                    Thread t = new Thread(new ThreadStart(ScoreSaberThread)) { IsBackground = true };
                     t.Start();
                 }
                 if (TestConfig.Instance.UseBeatLeader)
                 {
-                    Thread t = new Thread(new ThreadStart(BeatLeaderThread));
+                    Thread t = new Thread(new ThreadStart(BeatLeaderThread)) { IsBackground = true };
                     t.Start();
                 }
             }
-
+            catch (Exception ex)
+            {
+                Plugin.Log.Error($"Unable to load personal-best user information: {ex}");
+            }
         }
 
         static int GetDifficultyRank(BeatmapDifficulty difficulty)
@@ -181,11 +197,7 @@ namespace BetterMissCounter
                         if(ids[i] == userID)
                         {
                             int totalMisses = Int32.Parse(missedNotes[i]) + Int32.Parse(badCuts[i]);
-                            if (PBMissCount == -1 || totalMisses < PBMissCount)
-                            {
-                                PBMissCount = totalMisses;
-                                bottomText.text = TestConfig.Instance.BottomText + PBMissCount;
-                            }
+                            PublishPersonalBest(totalMisses);
                             return;
                         }
                     }
@@ -211,11 +223,7 @@ namespace BetterMissCounter
                 if(missedNotes.Length > 0)
                 {
                     int totalMisses = Int32.Parse(missedNotes[0]) + Int32.Parse(badCuts[0]);
-                    if (PBMissCount == -1 || totalMisses < PBMissCount)
-                    {
-                        PBMissCount = totalMisses;
-                        bottomText.text = TestConfig.Instance.BottomText + PBMissCount;
-                    }
+                    PublishPersonalBest(totalMisses);
                     return;
                 }
             }
@@ -227,7 +235,21 @@ namespace BetterMissCounter
 
         public override void CounterDestroy()
         {
+            destroyed = true;
+        }
 
+        private void PublishPersonalBest(int totalMisses)
+        {
+            UnityMainThreadTaskScheduler.Factory.StartNew(() =>
+            {
+                if (destroyed || !bottomText) return;
+                if (PBMissCount == -1 || totalMisses < PBMissCount)
+                {
+                    PBMissCount = totalMisses;
+                    bottomText.text = TestConfig.Instance.BottomText + PBMissCount;
+                    UpdateCount();
+                }
+            });
         }
 
         public void OnNoteCut(NoteData data, NoteCutInfo info)
