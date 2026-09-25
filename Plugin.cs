@@ -103,7 +103,7 @@ namespace BetterMissCounter
             topText.color = TestConfig.Instance.TopColor;
             missText.fontSize = 4f;
             missText.text = "0";
-            missText.color = TestConfig.Instance.LessColor;
+            missText.color = Color.white;
             bottomText.fontSize = 2f;
             bottomText.color = TestConfig.Instance.BottomColor;
 
@@ -266,10 +266,18 @@ namespace BetterMissCounter
         {
             missCount += add;
             missText.text = ""+missCount;
-            if(PBMissCount > -1)
+            if (missCount == 0)
+            {
+                missText.color = Color.white;
+            }
+            else if (PBMissCount > -1)
             {
                 missText.color = missCount < PBMissCount ? TestConfig.Instance.LessColor :
                     missCount == PBMissCount ? TestConfig.Instance.EqualColor : TestConfig.Instance.MoreColor;
+            }
+            else
+            {
+                missText.color = TestConfig.Instance.LessColor;
             }
         }
 
