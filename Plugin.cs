@@ -6,7 +6,7 @@ using BS_Utils.Gameplay;
 using Zenject;
 using System;
 using System.Collections.Generic;
-using System.Net;
+using System.Net.Http;
 using UnityEngine;
 using System.Threading;
 using System.Threading.Tasks;
@@ -83,6 +83,8 @@ namespace BetterMissCounter
 
         [Inject] private GameplayCoreSceneSetupData data { get; set; }
         private volatile bool destroyed;
+        private static readonly HttpClient Client = new HttpClient();
+        private readonly CancellationTokenSource loadCancellation = new CancellationTokenSource();
 
         int difficultyRank;
         string difficulty;
@@ -121,22 +123,17 @@ namespace BetterMissCounter
 
         private async Task LoadPersonalBestsAsync()
         {
+            var cancellationToken = loadCancellation.Token;
             try
             {
+                if (!TestConfig.Instance.UseScoreSaber && !TestConfig.Instance.UseBeatLeader) return;
                 var user = await GetUserInfo.GetUserAsync();
                 if (destroyed || user == null) return;
                 userID = user.platformUserId;
                 userName = user.userName;
-                if (TestConfig.Instance.UseScoreSaber)
-                {
-                    Thread t = new Thread(new ThreadStart(ScoreSaberThread)) { IsBackground = true };
-                    t.Start();
-                }
-                if (TestConfig.Instance.UseBeatLeader)
-                {
-                    Thread t = new Thread(new ThreadStart(BeatLeaderThread)) { IsBackground = true };
-                    t.Start();
-                }
+                await Task.WhenAll(
+                    TestConfig.Instance.UseScoreSaber ? LoadScoreSaberAsync(cancellationToken) : Task.CompletedTask,
+                    TestConfig.Instance.UseBeatLeader ? LoadBeatLeaderAsync(cancellationToken) : Task.CompletedTask);
             }
             catch (Exception ex)
             {
@@ -178,12 +175,27 @@ namespace BetterMissCounter
 
         public void ScoreSaberThread()
         {
-            WebClient client = new WebClient();
+            if (!destroyed) _ = LoadScoreSaberAsync(loadCancellation.Token);
+        }
+
+        private static async Task<string> DownloadAsync(string url, CancellationToken cancellationToken)
+        {
+            using (var response = await Client.GetAsync(url, cancellationToken).ConfigureAwait(false))
+            {
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            }
+        }
+
+        private async Task LoadScoreSaberAsync(CancellationToken cancellationToken)
+        {
             for (int page = 1; ; page++)
             {
                 try
                 {
-                    string res = client.DownloadString("https://scoresaber.com/api/leaderboard/by-hash/" + levelHash + "/scores?page=" + page + "&difficulty=" + difficultyRank + "&gameMode=Solo" + characteristic + "&search=" + HttpUtility.UrlEncode(userName));
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string res = await DownloadAsync("https://scoresaber.com/api/leaderboard/by-hash/" + levelHash + "/scores?page=" + page + "&difficulty=" + difficultyRank + "&gameMode=Solo" + characteristic + "&search=" + HttpUtility.UrlEncode(userName), cancellationToken).ConfigureAwait(false);
+                    if (destroyed) return;
 
                     String[] ids = GetStringsBetweenStrings(res, "\"id\": \"", "\"");
                     String[] missedNotes = GetStringsBetweenStrings(res, "\"missedNotes\": ", ",");
@@ -202,7 +214,7 @@ namespace BetterMissCounter
                         }
                     }
 
-                    if (page == ((Int32.Parse(totalItems[0]) - 1) / Int32.Parse(itemsPerPage[0]) + 1))
+                    if (page >= ((Int32.Parse(totalItems[0]) - 1) / Int32.Parse(itemsPerPage[0]) + 1))
                         return;
                 }
                 catch
@@ -214,10 +226,16 @@ namespace BetterMissCounter
 
         public void BeatLeaderThread()
         {
-            WebClient client = new WebClient();
+            if (!destroyed) _ = LoadBeatLeaderAsync(loadCancellation.Token);
+        }
+
+        private async Task LoadBeatLeaderAsync(CancellationToken cancellationToken)
+        {
             try
             {
-                string res = client.DownloadString("https://api.beatleader.xyz/score/" + userID + "/" + levelHash + "/" + difficulty + "/" + characteristic);
+                cancellationToken.ThrowIfCancellationRequested();
+                string res = await DownloadAsync("https://api.beatleader.xyz/score/" + userID + "/" + levelHash + "/" + difficulty + "/" + characteristic, cancellationToken).ConfigureAwait(false);
+                if (destroyed) return;
                 String[] missedNotes = GetStringsBetweenStrings(res, "\"missedNotes\":", ",");
                 String[] badCuts = GetStringsBetweenStrings(res, "\"badCuts\":", ",");
                 if(missedNotes.Length > 0)
@@ -235,11 +253,15 @@ namespace BetterMissCounter
 
         public override void CounterDestroy()
         {
+            if (destroyed) return;
             destroyed = true;
+            loadCancellation.Cancel();
+            loadCancellation.Dispose();
         }
 
         private void PublishPersonalBest(int totalMisses)
         {
+            if (destroyed) return;
             UnityMainThreadTaskScheduler.Factory.StartNew(() =>
             {
                 if (destroyed || !bottomText) return;
