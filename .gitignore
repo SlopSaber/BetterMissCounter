@@ -1,0 +1,5 @@
+# Local IDE settings and generated build output
+.vs/
+bin/
+obj/
+*.csproj.user
