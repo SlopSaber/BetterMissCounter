@@ -1,6 +1,7 @@
 ﻿using IPA;
 using IPALogger = IPA.Logging.Logger;
 using CountersPlus.Counters.Interfaces;
+using CountersPlus.Custom;
 using TMPro;
 using BS_Utils.Gameplay;
 using Zenject;
@@ -72,6 +73,26 @@ namespace BetterMissCounter
         public Color MoreColor { get => TestConfig.Instance.MoreColor; set => TestConfig.Instance.MoreColor = value; }
         public bool UseScoreSaber { get => TestConfig.Instance.UseScoreSaber; set => TestConfig.Instance.UseScoreSaber = value; }
         public bool UseBeatLeader { get => TestConfig.Instance.UseBeatLeader; set => TestConfig.Instance.UseBeatLeader = value; }
+    }
+
+    public class CounterPreview : ICounterPreview
+    {
+        public void Render(CounterPreviewContext preview)
+        {
+            TMP_Text topText = preview.CreateText();
+            TMP_Text missText = preview.CreateText(new Vector3(0, -0.35f, 0));
+            TMP_Text bottomText = preview.CreateText(new Vector3(0, -0.65f, 0));
+
+            topText.fontSize = 3f;
+            topText.text = TestConfig.Instance.TopText;
+            topText.color = TestConfig.Instance.TopColor;
+            missText.fontSize = 4f;
+            missText.text = "2";
+            missText.color = TestConfig.Instance.LessColor;
+            bottomText.fontSize = 2f;
+            bottomText.text = TestConfig.Instance.BottomText + "3";
+            bottomText.color = TestConfig.Instance.BottomColor;
+        }
     }
 
     public class CustomCounter : CountersPlus.Counters.Custom.BasicCustomCounter, INoteEventHandler

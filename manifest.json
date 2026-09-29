@@ -13,6 +13,7 @@
     "CountersPlus.CustomCounter": {
       "Name": "Better Miss Counter",
       "CounterLocation": "BetterMissCounter.CustomCounter",
+      "PreviewLocation": "BetterMissCounter.CounterPreview",
       "ConfigDefaults": {
         "Enabled": true,
         "Position": "BelowCombo",
