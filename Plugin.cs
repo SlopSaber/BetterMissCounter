@@ -104,7 +104,7 @@ namespace BetterMissCounter
 
         [Inject] private GameplayCoreSceneSetupData data { get; set; }
         private volatile bool destroyed;
-        private static readonly HttpClient Client = new HttpClient();
+        private static readonly Lazy<HttpClient> Client = new Lazy<HttpClient>(() => new HttpClient());
         private readonly CancellationTokenSource loadCancellation = new CancellationTokenSource();
 
         int difficultyRank;
@@ -243,7 +243,7 @@ namespace BetterMissCounter
 
         private static async Task<string> DownloadAsync(string url, CancellationToken cancellationToken)
         {
-            using (var response = await Client.GetAsync(url, cancellationToken).ConfigureAwait(false))
+            using (var response = await Client.Value.GetAsync(url, cancellationToken).ConfigureAwait(false))
             {
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
