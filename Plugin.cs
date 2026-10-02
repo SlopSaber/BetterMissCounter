@@ -145,14 +145,28 @@ namespace BetterMissCounter
 
         private async Task QueueScoreSaberAsync(PersonalBestRequest request)
         {
-            int? personalBest = await Task.Run(() => LoadScoreSaberAsync(request)).ConfigureAwait(false);
-            if (personalBest.HasValue) PublishPersonalBest(personalBest.Value);
+            try
+            {
+                int? personalBest = await Task.Run(() => LoadScoreSaberAsync(request)).ConfigureAwait(false);
+                if (personalBest.HasValue) PublishPersonalBest(personalBest.Value);
+            }
+            catch
+            {
+                return;
+            }
         }
 
         private async Task QueueBeatLeaderAsync(PersonalBestRequest request)
         {
-            int? personalBest = await Task.Run(() => LoadBeatLeaderAsync(request)).ConfigureAwait(false);
-            if (personalBest.HasValue) PublishPersonalBest(personalBest.Value);
+            try
+            {
+                int? personalBest = await Task.Run(() => LoadBeatLeaderAsync(request)).ConfigureAwait(false);
+                if (personalBest.HasValue) PublishPersonalBest(personalBest.Value);
+            }
+            catch
+            {
+                return;
+            }
         }
 
         public override void CounterInit()
